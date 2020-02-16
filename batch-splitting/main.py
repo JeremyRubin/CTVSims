@@ -7,7 +7,7 @@ MAX_BLOCKWEIGHT = 1000000
 # The number of blocks to run the simulator for.
 # It can be a bit slow, but effects should be visible within 100 blocks,
 # depending on distributions and other parameters.
-SIM_BLOCKS = 500
+SIM_BLOCKS = 50
 
 # Time in seconds between expected blocks.
 AVG_TIME_BETWEEN_BLOCKS = 10*60
@@ -69,6 +69,11 @@ elif FEE_DISTRIBUTION_TYPE == "lognormal":
 elif FEE_DISTRIBUTION_TYPE == "abscauchy":
     MY_FEE_DISTRIBUTION = lambda N: np.abs(np.random.standard_cauchy(N))
     GLOBAL_FEE_DISTRIBUTION = lambda N: np.abs(np.random.standard_cauchy(N))
+elif FEE_DISTRIBUTION_TYPE == "bimodal":
+    MY_FEE_DISTRIBUTION = lambda N: np.random.beta(0.5, 0.5, N)
+    GLOBAL_FEE_DISTRIBUTION = lambda np.random.beta(0.5,0.5, N)
+else:
+    raise ValueError("Invalid distribution: "+FEE_DISTRIBUTION_TYPE)
 # Pick a priority for each payment from our distributions...
 tx_priority = map(GLOBAL_FEE_DISTRIBUTION, n_txns)
 # sorted for later performance reasons
