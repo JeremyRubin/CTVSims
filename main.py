@@ -7,7 +7,7 @@ MAX_BLOCKWEIGHT = 1000000
 # The number of blocks to run the simulator for.
 # It can be a bit slow, but effects should be visible within 100 blocks,
 # depending on distributions and other parameters.
-SIM_BLOCKS = 500
+SIM_BLOCKS = 50
 
 # Time in seconds between expected blocks.
 AVG_TIME_BETWEEN_BLOCKS = 10*60
@@ -140,7 +140,8 @@ STRATEGIES = ["BATCH_GROUP_MAX",
               "BATCH_MAX",
               "NOBATCH_MED",
               "BATCH_GROUP_MAX_CTV_MIN_FOLLOWUP",
-              "BATCH_GROUP_MAX_DOUBLE_CTV_MIN_FOLLOWUP"]
+              "BATCH_GROUP_MAX_DOUBLE_CTV_MIN_FOLLOWUP",
+              "BATCH_GROUP_MAX_DOUBLE_CTV_CPFP_FOLLOWUP"]
 
 fig = plt.figure()
 n_strats = len(STRATEGIES)
@@ -227,6 +228,8 @@ for (strategy_idx, strategy) in enumerate(STRATEGIES):
                 # together and then we pay the min of the median or max feerate
                 # in each batch
                 bins, bin_edges = np.histogram(my_payment_priority[i], bins="auto", range=(0, median))
+                bins[-1] += my_payments[i] - sum(bins)
+                assert sum(bins) == my_payments[i]
                 for (bin_idx, count) in enumerate(bins):
                     if count == 0: continue
                     lo_priority, hi_priority = bin_edges[bin_idx:bin_idx+2]
@@ -250,6 +253,8 @@ for (strategy_idx, strategy) in enumerate(STRATEGIES):
                 # one layer of a high fee paying CTV root.
 
                 bins, bin_edges = np.histogram(my_payment_priority[i], bins="auto", range=(0, median))
+                bins[-1] += my_payments[i] - sum(bins)
+                assert sum(bins) == my_payments[i]
 
                 # Pay High Fee for Root
                 priority = min(median, max(my_payment_priority[i]))
@@ -281,6 +286,8 @@ for (strategy_idx, strategy) in enumerate(STRATEGIES):
                     my_issued_fee += weight*priority
                     my_issued_weight_this_block[i] += weight
             if strategy == "BATCH_GROUP_MAX_CTV_MIN_FOLLOWUP":
+                # Pay 10-block low (but mineable) fee for each bin
+                min_fee = min(min_priority[max(i-10,0):i])
                 # In this strategy we batch transactions of similar feerate
                 # together and then we pay the min of the min feerate over the
                 # last ten blocks or max feerate in each batch
@@ -288,7 +295,10 @@ for (strategy_idx, strategy) in enumerate(STRATEGIES):
                 # one layer of a high fee paying CTV root with n_bins outputs.
                 #
                 # We cut through bins with only one element
-                bins, bin_edges = np.histogram(my_payment_priority[i], bins="auto", range=(0, median))
+                bins, bin_edges = np.histogram(my_payment_priority[i],
+                                               bins="auto", range=(0, min_fee))
+                bins[-1] += my_payments[i] - sum(bins)
+                assert sum(bins) == my_payments[i]
 
                 # Pay High Fee for Root
                 priority = min(median, max(my_payment_priority[i]))
@@ -299,8 +309,6 @@ for (strategy_idx, strategy) in enumerate(STRATEGIES):
                 my_issued_fee += root_weight*priority
                 my_issued_weight_this_block[i] += root_weight
 
-                # Pay 10-block low (but mineable) fee for each bin
-                min_fee = min(min_priority[max(i-10,0):i])
                 for (bin_idx, count) in enumerate(bins):
                     # don't make a txn for empty buckets
                     if count == 0: continue
@@ -326,8 +334,14 @@ for (strategy_idx, strategy) in enumerate(STRATEGIES):
                 #
                 # We cut through bins with only one element
 
+                # Pay 10-block low (but mineable) fee for each bin and second
+                # root
+                min_fee = min(min_priority[max(i-10,0):i])
 
-                bins, bin_edges = np.histogram(my_payment_priority[i], bins="auto", range=(0, median))
+                bins, bin_edges = np.histogram(my_payment_priority[i],
+                                               bins="auto", range=(0, min_fee))
+                bins[-1] += my_payments[i] - sum(bins)
+                assert sum(bins) == my_payments[i]
 
                 # Pay High Fee for first Root
                 priority = min(median, max(my_payment_priority[i]))
@@ -338,9 +352,6 @@ for (strategy_idx, strategy) in enumerate(STRATEGIES):
                 my_issued_fee += root_weight*priority
                 my_issued_weight_this_block[i] += root_weight
 
-                # Pay 10-block low (but mineable) fee for each bin and second
-                # root
-                min_fee = min(min_priority[max(i-10,0):i])
                 # Second root with low fee
                 second_root_weight = AVG_WEIGHT - 1*AVG_OUTPUT_WEIGHT + AVG_OUTPUT_WEIGHT*n_bins - AVG_WITNESS_WEIGHT*AVG_N_INPUT
                 priority = min_fee
