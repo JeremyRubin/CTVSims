@@ -7,7 +7,7 @@ MAX_BLOCKWEIGHT = 1000000
 # The number of blocks to run the simulator for.
 # It can be a bit slow, but effects should be visible within 100 blocks,
 # depending on distributions and other parameters.
-SIM_BLOCKS = 50
+SIM_BLOCKS = 500
 
 # Time in seconds between expected blocks.
 AVG_TIME_BETWEEN_BLOCKS = 10*60
@@ -369,6 +369,56 @@ for (strategy_idx, strategy) in enumerate(STRATEGIES):
                     priority = hi_priority
                     # Pay the min of the median or max priority in batch
                     priority = min(min_fee, priority)
+                    weight = AVG_WEIGHT - AVG_N_OUTPUT*AVG_OUTPUT_WEIGHT - AVG_WITNESS_WEIGHT*AVG_N_INPUT + count*AVG_OUTPUT_WEIGHT
+                    # It's mine, but no one got paid because we counted the root
+                    mempool.add_to_mempool((priority, weight, True, 0))
+                    my_issued_fee += weight*priority
+                    my_issued_weight_this_block[i] += weight
+
+            if strategy == "BATCH_GROUP_MAX_DOUBLE_CTV_CPFP_FOLLOWUP":
+                # In this strategy we batch transactions of similar feerate
+                # together and then we pay 0 (leaving it up to CPFP)
+                # But instead of making independent batches, we put them through
+                # two layers of CTV: a high fee paying CTV root with one output,
+                # and then a 0 paying CTV root with n_bins outputs.
+                #
+                # We cut through bins with only one element
+                #
+                # This puts people into priority bins, but allows CPFP to commit
+                # to the fees later avoiding over-offering of fees.
+
+                # Pay 10-block low (but mineable) fee for each bin and second
+                # root
+                min_fee = min(min_priority[max(i-10,0):i])
+
+                bins, bin_edges = np.histogram(my_payment_priority[i],
+                                               bins="auto", range=(0, min_fee))
+                bins[-1] += my_payments[i] - sum(bins)
+                assert sum(bins) == my_payments[i]
+
+                # Pay High Fee for first Root
+                priority = min(median, max(my_payment_priority[i]))
+                n_bins = sum(b != 0 for b in bins)
+                root_weight = AVG_WEIGHT - 1*AVG_OUTPUT_WEIGHT
+                # counts for everyone being paid when confirmed
+                mempool.add_to_mempool((priority, root_weight, True, my_payments[i]))
+                my_issued_fee += root_weight*priority
+                my_issued_weight_this_block[i] += root_weight
+
+                # Second root with low fee
+                second_root_weight = AVG_WEIGHT - 1*AVG_OUTPUT_WEIGHT + AVG_OUTPUT_WEIGHT*n_bins - AVG_WITNESS_WEIGHT*AVG_N_INPUT
+                priority = 0
+                mempool.add_to_mempool((priority, second_root_weight, True, 0))
+                my_issued_fee += second_root_weight*priority
+                my_issued_weight_this_block[i] += second_root_weight
+
+                for (bin_idx, count) in enumerate(bins):
+                    # don't make a txn for empty buckets
+                    if count == 0: continue
+                    # If the bucket is a single element, just directly include
+                    # it in the root & skip a CTV extra step
+                    if count == 1: continue
+                    priority = 0
                     weight = AVG_WEIGHT - AVG_N_OUTPUT*AVG_OUTPUT_WEIGHT - AVG_WITNESS_WEIGHT*AVG_N_INPUT + count*AVG_OUTPUT_WEIGHT
                     # It's mine, but no one got paid because we counted the root
                     mempool.add_to_mempool((priority, weight, True, 0))
