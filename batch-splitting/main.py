@@ -71,7 +71,7 @@ elif FEE_DISTRIBUTION_TYPE == "abscauchy":
     GLOBAL_FEE_DISTRIBUTION = lambda N: np.abs(np.random.standard_cauchy(N))
 elif FEE_DISTRIBUTION_TYPE == "bimodal":
     MY_FEE_DISTRIBUTION = lambda N: np.random.beta(0.5, 0.5, N)
-    GLOBAL_FEE_DISTRIBUTION = lambda np.random.beta(0.5,0.5, N)
+    GLOBAL_FEE_DISTRIBUTION = lambda N: np.random.beta(0.5,0.5, N)
 else:
     raise ValueError("Invalid distribution: "+FEE_DISTRIBUTION_TYPE)
 # Pick a priority for each payment from our distributions...
@@ -150,17 +150,24 @@ STRATEGIES = ["BATCH_GROUP_MAX",
 
 fig = plt.figure()
 n_strats = len(STRATEGIES)
-g = (7, n_strats)
-plot_offered_fees = plt.subplot2grid(g, (0,0), colspan=n_strats)
-plot_accepted_fees = plt.subplot2grid(g, (1,0), colspan=n_strats)
+g = (6, n_strats)
+plot_offered_fees = plt.subplot2grid(g, (1,4), colspan=n_strats/2)
+plot_accepted_fees = plt.subplot2grid(g, (1,0), colspan=n_strats/2)
 plot_confirmed_payments = plt.subplot2grid(g, (2,0), colspan=n_strats)
 plot_fee_bands = [0]*n_strats
 for (i,strat) in enumerate(STRATEGIES):
     plot_fee_bands[i] = plt.subplot2grid(g, (3,i), colspan=1)
     plot_fee_bands[i].set_yscale('log')
-plot_overpaid = plt.subplot2grid(g, (4,0), colspan=n_strats)
-plot_weight_issued = plt.subplot2grid(g, (5,0), colspan=n_strats)
-plot_weight_mined = plt.subplot2grid(g, (6,0), colspan=n_strats)
+plot_weight_issued = plt.subplot2grid(g, (4,4), colspan=n_strats/2)
+plot_weight_mined = plt.subplot2grid(g, (4,0), colspan=n_strats/2)
+plot_overpaid = plt.subplot2grid(g, (5,0), colspan=n_strats)
+plot_priority_global = plt.subplot2grid(g, (0,0), colspan=n_strats/2)
+plot_priority_my = plt.subplot2grid(g, (0,4), colspan=n_strats/2)
+
+plot_priority_global.set_title("Global TX Priority PDF")
+plot_priority_global.hist(np.concatenate(tx_priority).ravel(), histtype="step", stacked=True, density=True, bins=1000)
+plot_priority_my.set_title("My TX Priority PDF")
+plot_priority_my.hist(np.concatenate(my_payment_priority).ravel(), histtype="step", stacked=True, density=True, bins=1000)
 
 plot_offered_fees.set_title("Offered Fees")
 plot_accepted_fees.set_title("Accepted Fees / Offered Fees")
