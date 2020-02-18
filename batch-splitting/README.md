@@ -2,13 +2,15 @@
 
 Check Template Verify is a new opcode for Bitcoin which allows transaction
 issuers to split up their transaction into send and receive components. See
-https://utxos.org for more information.
+https://utxos.org for more information. This is potentially a big benefit
+because end users can realize faster confirmations on pending transactions.
 
 There is a concern that CTV would result in higher overall chain utilization
-(because of overhead) than existing batching solutions.
+(because of overhead) than existing batching solutions. Ignoring the benefits
+that CTV can have for earlier confirmations, it would be bad to introduce a
+change to Bitcoin that causes users to be wasteful of chain space.
 
-
-This simulation analyzes a model where that's not true.
+This simulation proposes and analyzes a model where CTV is a good user of chainspace.
 
 The point of this simulation is to show that CTV is not *worse* than status quo
 with respect to scalability. I hacked this together in a couple of hours so feel
@@ -136,7 +138,7 @@ D. If B., then C..
 E. If A. and B., then CheckTemplateVerify does not decrease the availability of
 chain space, even marginally so.
 
-# Results:
+# Results
 
 I recommend you run main.py yourself to see for yourself (and zoom around), as
 well as play around with different parameters. The code is reasonably
@@ -149,6 +151,13 @@ And zoomed in on the interesting bits:
 ![](examples/ExampleRunZoomed.png)
 
 This confirms all of the claims presented previously, and shows that CTV can be 
+a better user of chain space than existing methods.
+
+This is an important point! We've demonstrated that CTV is better in terms of
+chain space but we haven't discussed the "first order" benefits of CTV for
+decongesting the mempool. See https://utxos.org/analysis/bip_simulation/.
+This means not only will CTV help us confirm more payments more quickly, but
+we'll also use less space. A pure win-win.
 
 # Limitations
 
@@ -158,3 +167,17 @@ a new RBF batch, which would benefit Priority Batching but not CTV batching.
 The BATCH_GROUP_MAX_DOUBLE_CTV_CPFP_FOLLOWUP strategy also does not actually
 use CPFP, a better simulation would measure how much fee savings can be realized
 with CPFP.
+
+If the assumptions around priority distributions do not hold, then CTV still has
+benefits worth pursuing, but we should more carefully think about the space
+usage impact on Bitcoin. With the strategies for batching presented, the overall
+chain usage is a constant amount more, so the impact is at least non-asymptotic.
+However, if CTV is still used in a tree structure to minimize individual
+redeemer overhead, then what is the overhead? Assuming a radix of r, we need N/r
+base layer transactions. And then N/r^2 above that, etc. For r >= 1, 1/r^0 +
+1/r^1...1/r^inf = 1/(1-1/r).  So CTV would use about 10% more *transactions* for
+a radix of 10, 5% more for a radix of 20, 1% for a radix of 100. The
+transactions roughly corresponds to the amount of space used as well. Overall,
+this means that businesses can balance out the worth of per-user decongesting
+effects (which are optimal around radix 4) with fee savings on a dynamic basis,
+and able to dial down the overhead to very little.
